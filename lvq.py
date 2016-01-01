@@ -5,7 +5,8 @@ from joblib import Parallel, delayed
 from multiprocessing import Pool
 from functools import partial
 
-step = 0.5
+step = 0.9
+bias_param = 1
 def load_image(name):
     im = Image.open(name)
     return list(im.getdata())
@@ -36,7 +37,7 @@ class lvq_neuron:
             self.weights = weights
         self.input_dim = input_dim
         self.assigned_class = assigned_class
-        self.tiredness = 1.0
+        self.bias = 0.0
     def distance(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -48,7 +49,7 @@ class lvq_neuron:
     def score(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
-        return self.distance(vec) * self.tiredness
+        return self.distance(vec) * (10 ** self.bias)
     def attract(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -86,13 +87,13 @@ class lvq_net:
     @ classmethod
     def from_dict(cls, dictionary, neuron_count, output_dim):
         return cls(neuron_count, len(dictionary), output_dim)
-    def compete(self, vec, count_tiredness=True):
+    def compete(self, vec, count_bias=True):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
         min_index = 0
         min_score = 0
         scores = [0] * self.neuron_count
-        if count_tiredness:
+        if count_bias:
             for i, neuron in enumerate(self.neurons):
                 scores[i] = neuron.score(vec)
         else:
@@ -114,17 +115,28 @@ class lvq_net:
 #                min_score = e 
 
         print "winner is", min_index, "with score", min_score,
-        print "(tiredness", self.neurons[min_index].tiredness, ")"
+        print "(bias", self.neurons[min_index].bias, ")"
         return min_index, min_score
     def feed(self, vec, desired_class):
-        winner_index = self.compete(vec)
+        winner_index, winner_score = self.compete(vec)
         winner = self.neurons[winner_index]
-        print "winner is", winner_index
-        winner.tiredness += 1
         if winner.assigned_class == desired_class:
             winner.attract(vec)
+            winner.bias += bias_param
         else:
             winner.repel(vec)
+#        for neuron in self.neurons:
+#            if neuron is not winner:
+#                neuron.bias -= (neuron.bias - 1) * 0.1
+    def feed_multiple(self, vec_class, iterations):
+        done = [False] * len(vec_class)
+        print "Feeding class of", len(vec_class), "vectors",
+        for i in range(iterations):
+            print "Cycle", i, "out of", iterations, "...",
+            index = random.randint(0, len(vec_class) - 1)
+            print "feeding vector", index
+            self.feed(vec_class[index][0], vec_class[index][1])
+
     def feed_until(self, vec, desired_class, threshold):
         """ Feed until distance is below threshold. """
         winner_index, score = self.compete(vec)
