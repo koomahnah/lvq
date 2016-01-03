@@ -5,8 +5,10 @@ from joblib import Parallel, delayed
 from multiprocessing import Pool
 from functools import partial
 
-step = 0.9
+attract_step = 0.9
+repel_step = 0.5
 bias_param = 1
+bias_base = 2
 def load_image(name):
     im = Image.open(name)
     return list(im.getdata())
@@ -49,13 +51,13 @@ class lvq_neuron:
     def score(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
-        return self.distance(vec) * (10 ** self.bias)
+        return self.distance(vec) * (bias_base ** self.bias)
     def attract(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
         delta = [0] * self.input_dim
         for i in range(0, self.input_dim):
-            delta[i] = step * (vec[i] - self.weights[i])
+            delta[i] = attract_step * (vec[i] - self.weights[i])
             self.weights[i] = self.weights[i] + delta[i]
         print "attract, new distance is", self.distance(vec)
     def repel(self, vec):
@@ -63,7 +65,7 @@ class lvq_neuron:
             raise Exception("wrong length of input vector")
         delta = [0] * self.input_dim
         for i in range(0, self.input_dim):
-            delta[i] = step * (vec[i] - self.weights[i]) * (-1)
+            delta[i] = repel_step * (vec[i] - self.weights[i]) * (-1)
             self.weights[i] = self.weights[i] + delta[i]
         print "repel, new distance is", self.distance(vec)
 
