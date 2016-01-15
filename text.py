@@ -19,17 +19,20 @@ def feed_perpetual():
         lvqn.feed_multiple(zip(vectors, classes), len(vectors))
 #        lvq.step -= (lvq.step - 0.1) * 0.5
 #        print "Step is", lvq.step
-        print "Sleeping 5 sec..."
+        print "Sleeping 5 sec... Ctrl-C to stop feeding"
         time.sleep(5)
   
 print "Creating topics dict..."
 topics = {}
+doc_limit = int(raw_input("How many documents (per category) should be used? "))
+neuron_count = int(raw_input("How many neurons should LVQ have? "))
 for mdir in os.listdir('lvq'):
     topics[mdir] = []
     for (i, mfile) in enumerate(os.listdir('lvq/' + mdir)):
-        topics[mdir].append(open('lvq/' + mdir + '/' + mfile).read())
-        if i > 50:
+        if i >= doc_limit:
             break
+        print i, mfile
+        topics[mdir].append(open('lvq/' + mdir + '/' + mfile).read())
 
 print "Translating documents..."
 texts = []
@@ -50,6 +53,8 @@ classes = [i for doc in topics[key] for (i, key) in enumerate(topics)]
 print "Computing vectors..."
 vectors = [lvq.doc2vec(dictionary, document) for document in documents]
 print "Creating LVQ..."
-lvqn = lvq.lvq_net.from_dict(dictionary, len(vectors), 3)
+lvqn = lvq.lvq_net.from_dict(dictionary, neuron_count, 3)
 print "Feeding vectors..."
 feed_perpetual()
+print "Created 'lvqn' object. Use feed_perpetual() to continue training,"
+print "lvqn.classify(doc2vec(dictionary, document)) to classify."

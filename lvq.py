@@ -1,6 +1,5 @@
 import random
 import math
-import Image
 from joblib import Parallel, delayed
 from multiprocessing import Pool
 from functools import partial
@@ -9,17 +8,6 @@ attract_step = 0.9
 repel_step = 0.5
 bias_param = 1
 bias_base = 2
-def load_image(name):
-    im = Image.open(name)
-    return list(im.getdata())
-
-def print_image(image, size):
-    for i in range(0,size):
-        print image[i],
-        if i == 0:
-            continue
-        elif (i % math.sqrt(size)) == (math.sqrt(size) - 1):
-            print
 
 def doc2vec(dictionary, document):
     text = [word for word in document.split()]
@@ -40,6 +28,7 @@ class lvq_neuron:
         self.input_dim = input_dim
         self.assigned_class = assigned_class
         self.bias = 0.0
+
     def distance(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -48,10 +37,14 @@ class lvq_neuron:
             sum += math.pow(self.weights[i] - vec[i], 2)
         distance = math.sqrt(sum)
         return distance
+
     def score(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
+        # score takes bias ("conscioussnes") into account, preventing
+        # neuron from winning often
         return self.distance(vec) * (bias_base ** self.bias)
+
     def attract(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -60,6 +53,7 @@ class lvq_neuron:
             delta[i] = attract_step * (vec[i] - self.weights[i])
             self.weights[i] = self.weights[i] + delta[i]
         print "attract, new distance is", self.distance(vec)
+
     def repel(self, vec):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -69,6 +63,7 @@ class lvq_neuron:
             self.weights[i] = self.weights[i] + delta[i]
         print "repel, new distance is", self.distance(vec)
 
+# this was used only when trying to paralellize computation
 def comp_score(x, y, dim):
     sum = 0
     for i in range(0, dim):
@@ -86,9 +81,11 @@ class lvq_net:
         self.neuron_count = neuron_count
         self.input_dim = input_dim
         self.output_dim = output_dim
+
     @ classmethod
     def from_dict(cls, dictionary, neuron_count, output_dim):
         return cls(neuron_count, len(dictionary), output_dim)
+
     def compete(self, vec, count_bias=True):
         if len(vec) != self.input_dim:
             raise Exception("wrong length of input vector")
@@ -115,10 +112,10 @@ class lvq_net:
 #            if e < min_score or i == 0:
 #                min_index = i
 #                min_score = e 
-
         print "winner is", min_index, "with score", min_score,
         print "(bias", self.neurons[min_index].bias, ")"
         return min_index, min_score
+
     def feed(self, vec, desired_class):
         winner_index, winner_score = self.compete(vec)
         winner = self.neurons[winner_index]
@@ -130,7 +127,9 @@ class lvq_net:
 #        for neuron in self.neurons:
 #            if neuron is not winner:
 #                neuron.bias -= (neuron.bias - 1) * 0.1
+
     def feed_multiple(self, vec_class, iterations):
+        """ Feeds random document, class pair from vec_class """
         done = [False] * len(vec_class)
         print "Feeding class of", len(vec_class), "vectors",
         for i in range(iterations):
@@ -157,12 +156,16 @@ class lvq_net:
 
     def feed_doc(self, dictionary, document, desired_class):
         self.feed(doc2vec(dictionary, document), desired_class)
+
     def classify_doc(self, dictionary, document):
         self.classify(doc2vec(dictionary, document))
+
     def classify(self, vec):
 	index, score = self.compete(vec, False)
         return self.neurons[index].assigned_class
+
     def show_neuron(self, neuron_index):
+        """ This was useful while working on images """
         neuron = self.neurons[neuron_index]
         ret = [0] * self.input_dim
         for i in range(0, self.input_dim):
